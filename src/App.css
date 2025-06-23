@@ -1,0 +1,21 @@
+.App {
+  text-align: center;
+}
+
+/* Custom scrollbar for better mobile experience */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Ensure mobile viewport */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+}
