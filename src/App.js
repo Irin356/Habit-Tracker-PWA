@@ -10,6 +10,7 @@ import AuthWrapper from './components/AuthWrapper';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 import './App.css';
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // Main App Component (protected)
 function MainApp() {
@@ -706,6 +707,7 @@ function App() {
   return (
     <AuthProvider>
       <AppContent />
+        <SpeedInsights />
     </AuthProvider>
   );
 }
