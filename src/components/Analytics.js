@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 
 const Analytics = ({ habits }) => {
   // Get current week dates (Monday to Sunday)
@@ -11,7 +12,7 @@ const Analytics = ({ habits }) => {
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + mondayOffset + i);
-      weekDates.push(date.toDateString());
+      weekDates.push(date.toISOString().split('T')[0]); // Use YYYY-MM-DD format
     }
     return weekDates;
   };
@@ -19,9 +20,30 @@ const Analytics = ({ habits }) => {
   // Get weekly completion data for a habit
   const getWeeklyDataForHabit = (habit) => {
     const weekDates = getCurrentWeekDates();
+    const today = new Date().toISOString().split('T')[0];
+    
     return weekDates.map(date => {
-      // Check if habit was completed on this date
-      return habit.completedDates && habit.completedDates.includes(date) ? 1 : 0;
+      // Check if this date is in the past or today
+      const dateObj = new Date(date);
+      const todayObj = new Date(today);
+      
+      if (dateObj > todayObj) {
+        // Future date - return null to indicate it's not available yet
+        return null;
+      }
+      
+      // Check if habit has completedDates array
+      if (habit.completedDates && Array.isArray(habit.completedDates)) {
+        return habit.completedDates.includes(date) ? 1 : 0;
+      }
+      
+      // Fallback: Check if it's completed today using last_completed
+      if (date === today) {
+        return habit.last_completed === today ? 1 : 0;
+      }
+      
+      // For past dates without completedDates array, return 0
+      return 0;
     });
   };
 
@@ -30,17 +52,19 @@ const Analytics = ({ habits }) => {
     if (habits.length === 0) return 0;
     
     const weekDates = getCurrentWeekDates();
-    const today = new Date().toDateString();
+    const today = new Date().toISOString().split('T')[0];
     
     // Only count days up to today
-    const daysPassedThisWeek = weekDates.findIndex(date => date === today) + 1;
-    const validDaysCount = daysPassedThisWeek > 0 ? daysPassedThisWeek : 7;
+    const todayIndex = weekDates.findIndex(date => date === today);
+    const daysPassedThisWeek = todayIndex >= 0 ? todayIndex + 1 : 7;
     
-    const totalPossibleCompletions = habits.length * validDaysCount;
+    const totalPossibleCompletions = habits.length * daysPassedThisWeek;
     const actualCompletions = habits.reduce((sum, habit) => {
       const weeklyData = getWeeklyDataForHabit(habit);
       // Only count completions up to today
-      return sum + weeklyData.slice(0, validDaysCount).reduce((weekSum, day) => weekSum + day, 0);
+      return sum + weeklyData.slice(0, daysPassedThisWeek).reduce((weekSum, day) => {
+        return weekSum + (day === 1 ? 1 : 0);
+      }, 0);
     }, 0);
     
     return totalPossibleCompletions > 0 ? Math.round((actualCompletions / totalPossibleCompletions) * 100) : 0;
@@ -50,8 +74,8 @@ const Analytics = ({ habits }) => {
   const calculateMonthlyCompletion = () => {
     if (habits.length === 0) return 0;
     
-    const totalCompletions = habits.reduce((sum, habit) => sum + habit.completions, 0);
-    const totalTargetDays = habits.reduce((sum, habit) => sum + Math.min(habit.targetDays, 30), 0);
+    const totalCompletions = habits.reduce((sum, habit) => sum + (habit.completions || 0), 0);
+    const totalTargetDays = habits.reduce((sum, habit) => sum + Math.min(habit.target_days || 30, 30), 0);
     
     return totalTargetDays > 0 ? Math.round((totalCompletions / totalTargetDays) * 100) : 0;
   };
@@ -74,19 +98,25 @@ const Analytics = ({ habits }) => {
                 <div key={habit.id} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{habit.name}</span>
-                    <span className="text-sm text-gray-500">{habit.streak} days</span>
+                    <span className="text-sm text-gray-500">{habit.streak || 0} days</span>
                   </div>
                   <div className="flex gap-1">
                     {weeklyData.map((completed, index) => (
                       <div
                         key={index}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium ${
-                          completed 
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium relative ${
+                          completed === 1
                             ? `${habit.color} text-white` 
-                            : 'bg-gray-100 text-gray-400'
+                            : completed === 0
+                            ? 'bg-gray-100 text-gray-400'
+                            : 'bg-gray-50 text-gray-300' // Future dates
                         }`}
                       >
-                        {weekDays[index]}
+                        {completed === 1 ? (
+                          <Check size={14} className="text-white" />
+                        ) : (
+                          weekDays[index]
+                        )}
                       </div>
                     ))}
                   </div>
@@ -126,13 +156,13 @@ const Analytics = ({ habits }) => {
                 <div className="grid grid-cols-3 gap-4 text-center text-sm">
                   <div>
                     <div className="text-lg font-bold text-gray-800">
-                      {habits.reduce((sum, habit) => sum + habit.completions, 0)}
+                      {habits.reduce((sum, habit) => sum + (habit.completions || 0), 0)}
                     </div>
                     <div className="text-gray-500">Total Completions</div>
                   </div>
                   <div>
                     <div className="text-lg font-bold text-gray-800">
-                      {Math.max(...habits.map(habit => habit.streak), 0)}
+                      {habits.length > 0 ? Math.max(...habits.map(habit => habit.streak || 0)) : 0}
                     </div>
                     <div className="text-gray-500">Best Streak</div>
                   </div>
@@ -145,7 +175,7 @@ const Analytics = ({ habits }) => {
             </>
           ) : (
             <div className="text-center text-gray-500 text-sm py-4">
-              📊 Start tracking habits to see your completion timeline
+              Start tracking habits to see your completion timeline
             </div>
           )}
         </div>

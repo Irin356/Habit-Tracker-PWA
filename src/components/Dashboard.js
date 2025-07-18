@@ -1,8 +1,9 @@
+//Dashboard.js
 import React from 'react';
 import { Plus, Flame, Target, TrendingUp } from 'lucide-react';
 import HabitCard from './HabitCard';
 
-const Dashboard = ({ habits, stats, onToggleHabit, onShowAddHabit, onUpdateHabit }) => {
+const Dashboard = ({ habits, stats, onToggleHabit, onShowAddHabit, onUpdateHabit, onDeleteHabit }) => {
   return (
     <div className="space-y-6">
       {/* Header Stats */}
@@ -41,7 +42,13 @@ const Dashboard = ({ habits, stats, onToggleHabit, onShowAddHabit, onUpdateHabit
       {/* Habits Grid */}
       <div className="grid grid-cols-2 gap-4">
         {habits.map(habit => (
-          <HabitCard key={habit.id} habit={habit} onToggle={onToggleHabit} onUpdateHabit={onUpdateHabit} />
+          <HabitCard 
+            key={habit.id} 
+            habit={habit} 
+            onToggle={onToggleHabit} 
+            onUpdateHabit={onUpdateHabit}
+            onDeleteHabit={onDeleteHabit}
+          />
         ))}
         
         {/* Add Habit Card */}

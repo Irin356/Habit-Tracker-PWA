@@ -1,4 +1,6 @@
+//AddHabitModal.js
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
 
 const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
   const [newHabit, setNewHabit] = useState({
@@ -11,16 +13,11 @@ const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
   const handleAddHabit = () => {
     if (newHabit.name.trim()) {
       const habit = {
-        id: Date.now(),
         name: newHabit.name,
         icon: newHabit.icon,
         color: newHabit.color,
-        streak: 0,
-        completions: 0,
-        targetDays: 30,
         category: newHabit.category,
-        lastCompleted: null,
-        weeklyData: [0, 0, 0, 0, 0, 0, 0]
+        targetDays: 21 // This will be used as target_days in App.js
       };
       
       onAddHabit(habit);
@@ -40,7 +37,7 @@ const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
 
@@ -63,7 +60,7 @@ const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
               Icon
             </label>
             <div className="grid grid-cols-6 gap-2">
-              {['💧', '📚', '🏃', '🧘', '🥗', '💤', '📱', '🎯'].map(icon => (
+              {['💧', '📚', '🏃', '🧘', '🥗', '💤', '📱', '🎯', '🚭', '🥕', '🦷', '🐕'].map(icon => (
                 <button
                   key={icon}
                   onClick={() => setNewHabit(prev => ({ ...prev, icon }))}
@@ -83,7 +80,7 @@ const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Color
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {[
                 'bg-red-500',
                 'bg-orange-500', 
@@ -92,7 +89,7 @@ const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
                 'bg-blue-500',
                 'bg-purple-500',
                 'bg-pink-500',
-                'bg-gray-500'
+                'bg-gray-600'
               ].map(color => (
                 <button
                   key={color}

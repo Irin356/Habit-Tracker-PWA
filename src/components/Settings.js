@@ -1,7 +1,11 @@
+//Settings.js
 import React, { useState } from 'react';
 import { X, Bell, Moon, Trash2, Download, Upload, RefreshCw } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllData, onResetApp }) => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState({
     notifications: userProfile.notifications || false,
     darkMode: userProfile.darkMode || false,
@@ -14,43 +18,147 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
     onClose();
   };
 
-  const handleExportData = () => {
-    const data = {
-      habits: JSON.parse(localStorage.getItem('habitTrackerHabits') || '[]'),
-      profile: JSON.parse(localStorage.getItem('habitTrackerProfile') || '{}'),
-      exportDate: new Date().toISOString()
-    };
+  const handleExportData = async () => {
+    if (!user) return;
     
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `habit-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      // Get habits from Supabase
+      const { data: habits, error: habitsError } = await supabase
+        .from('habits')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (habitsError) throw habitsError;
+
+      // Get user profile from Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') throw profileError;
+
+      const data = {
+        habits: habits || [],
+        profile: profile || userProfile,
+        exportDate: new Date().toISOString()
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `habit-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      alert('Error exporting data. Please try again.');
+    }
   };
 
-  const handleImportData = (event) => {
+  const handleImportData = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = JSON.parse(e.target.result);
-          if (data.habits) {
-            localStorage.setItem('habitTrackerHabits', JSON.stringify(data.habits));
-          }
-          if (data.profile) {
-            localStorage.setItem('habitTrackerProfile', JSON.stringify(data.profile));
-          }
-          alert('Data imported successfully! Please refresh the page.');
-        } catch (error) {
-          alert('Invalid file format. Please select a valid backup file.');
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        
+        // Clear existing data first
+        await onClearAllData();
+        
+        // Import habits if they exist
+        if (data.habits && data.habits.length > 0) {
+          const habitsToImport = data.habits.map(habit => ({
+            ...habit,
+            user_id: user.id,
+            id: undefined // Remove old ID to create new ones
+          }));
+
+          const { error: habitsError } = await supabase
+            .from('habits')
+            .insert(habitsToImport);
+
+          if (habitsError) throw habitsError;
         }
-      };
-      reader.readAsText(file);
+
+        // Import profile if it exists
+        if (data.profile) {
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .upsert({
+              user_id: user.id,
+              name: data.profile.name || userProfile.name,
+              email: data.profile.email || userProfile.email,
+              goal: data.profile.goal || userProfile.goal,
+              profile_picture: data.profile.profile_picture || userProfile.profilePicture,
+              settings: data.profile.settings || {
+                notifications: userProfile.notifications,
+                darkMode: userProfile.darkMode,
+                reminderTime: userProfile.reminderTime,
+                weekStartsOn: userProfile.weekStartsOn
+              }
+            });
+
+          if (profileError) throw profileError;
+        }
+
+        alert('Data imported successfully! Please refresh the page to see the changes.');
+        onClose();
+      } catch (error) {
+        console.error('Error importing data:', error);
+        alert('Invalid file format or import failed. Please select a valid backup file.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Function to remove duplicate habits - moved inside Settings component
+  const removeDuplicateHabits = async () => {
+    if (!user) return;
+
+    try {
+      const { data: allHabits, error } = await supabase
+        .from('habits')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const seen = new Set();
+      const duplicates = [];
+
+      for (const habit of allHabits) {
+        const habitKey = habit.name.toLowerCase();
+        if (seen.has(habitKey)) {
+          duplicates.push(habit.id);
+        } else {
+          seen.add(habitKey);
+        }
+      }
+
+      if (duplicates.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('habits')
+          .delete()
+          .in('id', duplicates);
+
+        if (deleteError) throw deleteError;
+        
+        console.log(`Removed ${duplicates.length} duplicate habits`);
+        alert(`Removed ${duplicates.length} duplicate habits. Please refresh the page to see the changes.`);
+      } else {
+        alert('No duplicate habits found.');
+      }
+    } catch (error) {
+      console.error('Error removing duplicates:', error);
+      alert('Error removing duplicates. Please try again.');
     }
   };
 
@@ -163,6 +271,14 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
                 <span>Import Data</span>
               </div>
             </div>
+
+            <button
+              onClick={removeDuplicateHabits}
+              className="w-full flex items-center gap-3 p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
+            >
+              <RefreshCw size={18} />
+              <span>Remove Duplicates</span>
+            </button>
 
             <button
               onClick={() => {

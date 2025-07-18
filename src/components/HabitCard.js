@@ -1,15 +1,20 @@
+//HabitCard.js
 import React, { useState } from 'react';
-import { CheckCircle2, Circle, Edit2, Save, X } from 'lucide-react';
+import { CheckCircle2, Circle, Edit2, Save, X, Trash2 } from 'lucide-react';
 
-const HabitCard = ({ habit, onToggle, onUpdateHabit }) => {
+const HabitCard = ({ habit, onToggle, onUpdateHabit, onDeleteHabit }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(habit.name);
   const [selectedIcon, setSelectedIcon] = useState(habit.icon);
   const [selectedColor, setSelectedColor] = useState(habit.color);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const today = new Date().toDateString();
-  const isCompleted = habit.lastCompleted === today;
-  const completionPercentage = (habit.completions / habit.targetDays) * 100;
+  // Fix: Use consistent date format for comparison
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  const isCompleted = habit.last_completed === today || 
+                     (habit.completedDates && habit.completedDates.includes(today));
+  
+  const completionPercentage = (habit.completions / habit.target_days) * 100;
 
   const handleSave = () => {
     if (editedName.trim()) {
@@ -27,6 +32,11 @@ const HabitCard = ({ habit, onToggle, onUpdateHabit }) => {
     setSelectedIcon(habit.icon);
     setSelectedColor(habit.color);
     setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    onDeleteHabit(habit.id);
+    setShowDeleteConfirm(false);
   };
 
   const icons = ['💧', '📚', '🏃', '🧘', '🥗', '💤', '📱', '🎯', '🚭', '🥕', '🦷', '🐕'];
@@ -102,6 +112,44 @@ const HabitCard = ({ habit, onToggle, onUpdateHabit }) => {
               Save
             </button>
           </div>
+          
+          {/* Delete Button */}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-full px-3 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
+          >
+            <Trash2 size={16} />
+            Delete Habit
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showDeleteConfirm) {
+    return (
+      <div className="bg-white rounded-3xl p-6 border-2 border-red-200 relative">
+        <div className="text-center space-y-4">
+          <div className="text-red-500">
+            <Trash2 size={32} className="mx-auto mb-2" />
+            <h3 className="font-semibold text-gray-800">Delete Habit?</h3>
+            <p className="text-sm text-gray-600 mt-1">This action cannot be undone.</p>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="flex-1 px-3 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex-1 px-3 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -131,18 +179,23 @@ const HabitCard = ({ habit, onToggle, onUpdateHabit }) => {
         </div>
       </div>
 
+      {/* Fixed completion button with proper styling */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onToggle(habit.id);
         }}
-        className={`absolute bottom-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+        className={`absolute bottom-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
           isCompleted 
-            ? 'bg-white text-green-500' 
-            : 'bg-white/20 text-white hover:bg-white/30'
+            ? 'bg-white text-green-500 shadow-lg' 
+            : 'bg-white/20 text-white hover:bg-white/30 border-2 border-white/40'
         }`}
       >
-        {isCompleted ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+        {isCompleted ? (
+          <CheckCircle2 size={20} className="text-green-500" />
+        ) : (
+          <Circle size={20} className="text-white" />
+        )}
       </button>
 
       {/* Progress ring */}
