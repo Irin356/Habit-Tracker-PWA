@@ -32,7 +32,7 @@ const SignIn = ({ onSwitchToSignUp, onSwitchToForgotPassword }) => {
     <div className="auth-background">
       <div className="auth-container">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-rose-800">Welcome To HabTrack</h2>
+          <h2 className="text-3xl font-bold text-rose-800">Welcome To HabTrack✨</h2>
           <p className="mt-2 text-gold-600">Sign in to continue tracking your habits</p>
         </div>
 
@@ -45,7 +45,7 @@ const SignIn = ({ onSwitchToSignUp, onSwitchToForgotPassword }) => {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-white">
                 Email address
               </label>
               <div className="mt-1 relative">
@@ -64,7 +64,7 @@ const SignIn = ({ onSwitchToSignUp, onSwitchToForgotPassword }) => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-white">
                 Password
               </label>
               <div className="mt-1 relative">
@@ -94,7 +94,7 @@ const SignIn = ({ onSwitchToSignUp, onSwitchToForgotPassword }) => {
             <button
               type="button"
               onClick={onSwitchToForgotPassword}
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className="text-sm text-white hover:text-gray-200 font-medium"
             >
               Forgot your password?
             </button>
@@ -111,12 +111,12 @@ const SignIn = ({ onSwitchToSignUp, onSwitchToForgotPassword }) => {
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-white">
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={onSwitchToSignUp}
-                className="text-blue-600 hover:text-blue-500 font-medium"
+                className="text-gray-200 hover:text-white font-medium underline"
               >
                 Sign up
               </button>

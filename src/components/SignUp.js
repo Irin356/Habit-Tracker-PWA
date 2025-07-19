@@ -1,3 +1,4 @@
+//SignUp.js
 import React, { useState } from 'react'
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -87,7 +88,7 @@ const SignUp = ({ onSwitchToSignIn }) => {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="name" className="block text-sm font-medium text-white">
                 Full Name
               </label>
               <div className="mt-1 relative">
@@ -106,7 +107,7 @@ const SignUp = ({ onSwitchToSignIn }) => {
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-white">
                 Email address
               </label>
               <div className="mt-1 relative">
@@ -125,7 +126,7 @@ const SignUp = ({ onSwitchToSignIn }) => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-white">
                 Password
               </label>
               <div className="mt-1 relative">
@@ -151,7 +152,7 @@ const SignUp = ({ onSwitchToSignIn }) => {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-white">
                 Confirm Password
               </label>
               <div className="mt-1 relative">
@@ -188,12 +189,12 @@ const SignUp = ({ onSwitchToSignIn }) => {
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-white">
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={onSwitchToSignIn}
-                className="text-blue-600 hover:text-blue-500 font-medium"
+                className="text-gray-200 hover:text-white font-medium underline"
               >
                 Sign in
               </button>

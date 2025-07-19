@@ -10,7 +10,7 @@ import AuthWrapper from './components/AuthWrapper';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 import './App.css';
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Main App Component (protected)
 function MainApp() {
@@ -58,7 +58,7 @@ function MainApp() {
           icon: "🏃",
           color: "bg-orange-500",
           category: "fitness",
-          target_days: 21,
+          target_days: 30,
           user_id: user.id
         },
         {
@@ -74,7 +74,7 @@ function MainApp() {
           icon: "🥕",
           color: "bg-orange-500",
           category: "nutrition",
-          target_days: 21,
+          target_days: 30,
           user_id: user.id
         },
         {
@@ -707,7 +707,7 @@ function App() {
   return (
     <AuthProvider>
       <AppContent />
-        <SpeedInsights />
+      <SpeedInsights />
     </AuthProvider>
   );
 }

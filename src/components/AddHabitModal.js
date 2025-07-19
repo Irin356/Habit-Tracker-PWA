@@ -17,7 +17,7 @@ const AddHabitModal = ({ isOpen, onClose, onAddHabit }) => {
         icon: newHabit.icon,
         color: newHabit.color,
         category: newHabit.category,
-        targetDays: 21 // This will be used as target_days in App.js
+        targetDays: 30 // This will be used as target_days in App.js
       };
       
       onAddHabit(habit);
