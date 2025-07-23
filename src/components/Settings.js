@@ -1,17 +1,64 @@
-//Settings.js
-import React, { useState } from 'react';
-import { X, Bell, Moon, Trash2, Download, Upload, RefreshCw } from 'lucide-react';
+//Settings.js - Improved with notification permission handling
+import React, { useState, useEffect } from 'react';
+import { X, Bell, Moon, Trash2, Download, Upload, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllData, onResetApp }) => {
   const { user } = useAuth();
+  const [notificationPermission, setNotificationPermission] = useState('default');
   const [settings, setSettings] = useState({
     notifications: userProfile.notifications || false,
     darkMode: userProfile.darkMode || false,
-    reminderTime: userProfile.reminderTime || '09:00',
+    reminderTime: userProfile.reminderTime || '02:08',
     weekStartsOn: userProfile.weekStartsOn || 'monday'
   });
+
+  // Check notification permission status
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, [isOpen]);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      alert('This browser does not support notifications');
+      return false;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        // Test notification
+        new Notification('HabTrack Notifications Enabled!', {
+          body: 'You will now receive daily habit reminders.',
+          icon: '/favicon.ico',
+          tag: 'permission-granted'
+        });
+        return true;
+      } else {
+        alert('Please enable notifications in your browser settings to receive reminders.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
+  };
+
+  const handleNotificationToggle = async (enabled) => {
+    if (enabled && notificationPermission !== 'granted') {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        return; // Don't update settings if permission denied
+      }
+    }
+    
+    setSettings(prev => ({ ...prev, notifications: enabled }));
+  };
 
   const handleSave = () => {
     onUpdateProfile({ ...userProfile, ...settings });
@@ -118,7 +165,7 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
     reader.readAsText(file);
   };
 
-  // Function to remove duplicate habits - moved inside Settings component
+  // Function to remove duplicate habits
   const removeDuplicateHabits = async () => {
     if (!user) return;
 
@@ -162,6 +209,28 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
     }
   };
 
+  const getNotificationStatusIcon = () => {
+    switch (notificationPermission) {
+      case 'granted':
+        return <CheckCircle size={16} className="text-green-500" />;
+      case 'denied':
+        return <AlertCircle size={16} className="text-red-500" />;
+      default:
+        return <AlertCircle size={16} className="text-yellow-500" />;
+    }
+  };
+
+  const getNotificationStatusText = () => {
+    switch (notificationPermission) {
+      case 'granted':
+        return 'Notifications enabled';
+      case 'denied':
+        return 'Notifications blocked - enable in browser settings';
+      default:
+        return 'Click to enable notifications';
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -194,11 +263,23 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
                 <input
                   type="checkbox"
                   checked={settings.notifications}
-                  onChange={(e) => setSettings(prev => ({ ...prev, notifications: e.target.checked }))}
+                  onChange={(e) => handleNotificationToggle(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
+            </div>
+
+            {/* Notification Status */}
+            <div className="ml-6 flex items-center gap-2 text-sm">
+              {getNotificationStatusIcon()}
+              <span className={`${
+                notificationPermission === 'granted' ? 'text-green-700' :
+                notificationPermission === 'denied' ? 'text-red-700' :
+                'text-yellow-700'
+              }`}>
+                {getNotificationStatusText()}
+              </span>
             </div>
 
             {settings.notifications && (
@@ -210,6 +291,14 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
                   onChange={(e) => setSettings(prev => ({ ...prev, reminderTime: e.target.value }))}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                <div className="text-xs text-gray-500">
+                  {notificationPermission === 'denied' && 
+                    "⚠️ Enable notifications in your browser settings to receive reminders"
+                  }
+                  {window.location.protocol === 'http:' && window.location.hostname === 'localhost' &&
+                    "ℹ️ Notifications work best on HTTPS. Deploy your app for better reliability."
+                  }
+                </div>
               </div>
             )}
           </div>
@@ -313,6 +402,8 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
             <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
               <div>Version: 1.0.0</div>
               <div>Build: PWA</div>
+              <div>Protocol: {window.location.protocol}</div>
+              <div>Host: {window.location.hostname}</div>
             </div>
           </div>
         </div>

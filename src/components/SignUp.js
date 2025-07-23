@@ -18,6 +18,27 @@ const SignUp = ({ onSwitchToSignIn }) => {
   
   const { signUp } = useAuth()
 
+  // Function to get user's timezone and location info
+  const getUserTimezoneInfo = () => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale
+    
+    // Get timezone offset in minutes
+    const timezoneOffset = new Date().getTimezoneOffset()
+    
+    // Get current date in user's timezone
+    const currentDate = new Date()
+    const userLocalDate = new Date(currentDate.getTime() - (timezoneOffset * 60000))
+    
+    return {
+      timezone,
+      locale,
+      timezoneOffset,
+      currentDate: userLocalDate.toISOString(),
+      dateString: userLocalDate.toISOString().split('T')[0] // YYYY-MM-DD format
+    }
+  }
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -45,7 +66,17 @@ const SignUp = ({ onSwitchToSignIn }) => {
     }
 
     try {
-      const { error } = await signUp(formData.email, formData.password)
+      // Get user's timezone information
+      const timezoneInfo = getUserTimezoneInfo()
+      
+      const { error } = await signUp(formData.email, formData.password, {
+        name: formData.name,
+        timezone: timezoneInfo.timezone,
+        locale: timezoneInfo.locale,
+        timezoneOffset: timezoneInfo.timezoneOffset,
+        signupDate: timezoneInfo.currentDate,
+        ...timezoneInfo
+      })
       
       if (error) {
         setError(error.message)
@@ -60,6 +91,7 @@ const SignUp = ({ onSwitchToSignIn }) => {
       }
     } catch (err) {
       setError('An unexpected error occurred')
+      console.error('Signup error:', err)
     } finally {
       setLoading(false)
     }

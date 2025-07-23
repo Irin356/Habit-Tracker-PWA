@@ -3,12 +3,14 @@ import SignIn from './SignIn'
 import SignUp from './SignUp'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
+import EmailConfirmation from './EmailConfirmation'
 
 const AuthWrapper = () => {
   const [currentView, setCurrentView] = useState('signin')
   const [resetTokenData, setResetTokenData] = useState(null)
+  const [confirmationData, setConfirmationData] = useState(null)
   
-  // Check URL parameters for reset password flow
+  // Check URL parameters for different auth flows
   useEffect(() => {
     const checkUrlParams = () => {
       const urlParams = new URLSearchParams(window.location.search)
@@ -35,26 +37,25 @@ const AuthWrapper = () => {
       console.log('All query params:', Object.fromEntries(urlParams))
       console.log('All hash params:', Object.fromEntries(hashParams))
       
-      // Store token data for reset password
-      const tokenData = {
-        accessToken,
-        type,
-        token,
-        resetToken,
-        error,
-        errorCode,
-        errorDescription
-      }
-      
-      // Check for error states first
-      if (error) {
-        console.log('❌ Error in URL, but still showing reset form')
-        setResetTokenData(tokenData)
-        setCurrentView('reset')
+      // Handle email confirmation flow
+      if (type === 'signup' || type === 'email_confirmation' || type === 'confirm') {
+        console.log('✅ Email confirmation flow detected')
+        const confirmData = {
+          accessToken,
+          type,
+          token,
+          error,
+          errorCode,
+          errorDescription,
+          success: !error && (accessToken || token)
+        }
+        
+        setConfirmationData(confirmData)
+        setCurrentView('email-confirmation')
         return
       }
       
-      // Check for different possible parameter combinations
+      // Handle password reset flow
       if ((accessToken && type === 'recovery') || 
           (token && type === 'recovery') ||
           (resetToken) ||
@@ -62,16 +63,38 @@ const AuthWrapper = () => {
           (token && type === 'reset') ||
           (accessToken && type === 'password_reset') ||
           (token && type === 'password_reset') ||
-          // Check if we're on the reset-password path
           window.location.pathname === '/reset-password' ||
-          // Check for our new reset parameter
           urlParams.get('reset') === 'true' ||
           hashParams.get('reset') === 'true') {
-        console.log('✅ Setting view to reset')
+        console.log('✅ Password reset flow detected')
+        const tokenData = {
+          accessToken,
+          type,
+          token,
+          resetToken,
+          error,
+          errorCode,
+          errorDescription
+        }
+        
         setResetTokenData(tokenData)
         setCurrentView('reset')
-      } else {
-        console.log('❌ No matching reset parameters found')
+        return
+      }
+      
+      // Handle general errors (like expired confirmation links)
+      if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
+        console.log('✅ Email confirmation error detected')
+        const confirmData = {
+          error,
+          errorCode,
+          errorDescription,
+          success: false
+        }
+        
+        setConfirmationData(confirmData)
+        setCurrentView('email-confirmation')
+        return
       }
     }
     
@@ -118,6 +141,13 @@ const AuthWrapper = () => {
           <ResetPassword 
             onNavigate={(view) => setCurrentView(view)}
             tokenData={resetTokenData}
+          />
+        )
+      case 'email-confirmation':
+        return (
+          <EmailConfirmation 
+            onNavigate={(view) => setCurrentView(view)}
+            confirmationData={confirmationData}
           />
         )
       default:

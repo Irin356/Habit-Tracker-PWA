@@ -1,4 +1,4 @@
-//App.js - Updated to use normalized database structure
+//App.js - Updated with notification system
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, BarChart3, Plus, Activity, Bell, Settings as SettingsIcon, User, LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -12,6 +12,68 @@ import { supabase } from './lib/supabase';
 import './App.css';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
+// Notification utility functions
+const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) {
+    console.log('This browser does not support notifications');
+    return false;
+  }
+
+  if (Notification.permission === 'granted') {
+    return true;
+  }
+
+  if (Notification.permission !== 'denied') {
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+  }
+
+  return false;
+};
+
+const showNotification = (title, body, icon = '/favicon.ico') => {
+  if (Notification.permission === 'granted') {
+    new Notification(title, {
+      body,
+      icon,
+      badge: '/favicon.ico',
+      tag: 'habit-reminder',
+      requireInteraction: true
+    });
+  }
+};
+
+const scheduleNotification = (time, habits) => {
+  const now = new Date();
+  const [hours, minutes] = time.split(':').map(Number);
+  
+  const scheduledTime = new Date();
+  scheduledTime.setHours(hours, minutes, 0, 0);
+  
+  // If the time has passed today, schedule for tomorrow
+  if (scheduledTime <= now) {
+    scheduledTime.setDate(scheduledTime.getDate() + 1);
+  }
+  
+  const timeDiff = scheduledTime.getTime() - now.getTime();
+  
+  return setTimeout(() => {
+    const incompleteHabits = habits.filter(habit => !habit.last_completed);
+    const habitCount = incompleteHabits.length;
+    
+    if (habitCount > 0) {
+      showNotification(
+        'HabTrack Reminder',
+        `You have ${habitCount} habit${habitCount > 1 ? 's' : ''} to complete today!`,
+        '/favicon.ico'
+      );
+    }
+    
+    // Schedule next notification for same time tomorrow
+    scheduleNotification(time, habits);
+  }, timeDiff);
+};
+
 // Main App Component (protected)
 function MainApp() {
   const { user } = useAuth();
@@ -20,6 +82,7 @@ function MainApp() {
   const [habitCompletions, setHabitCompletions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasCheckedForHabits, setHasCheckedForHabits] = useState(false);
+  const [notificationTimeout, setNotificationTimeout] = useState(null);
 
   // User Profile State
   const [userProfile, setUserProfile] = useState({
@@ -30,7 +93,7 @@ function MainApp() {
     joinDate: new Date().toISOString(),
     notifications: true,
     darkMode: false,
-    reminderTime: '09:00',
+    reminderTime: '02:08',
     weekStartsOn: 'monday'
   });
 
@@ -157,13 +220,20 @@ function MainApp() {
     if (!user) return;
     
     try {
+      // Get timezone from user metadata or fallback to detected timezone
+      const userTimezone = user.user_metadata?.timezone || 
+                          Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
       const { error } = await supabase
         .from('user_profiles')
         .insert({
           id: user.id,
           name: user.user_metadata?.name || '',
           email: user.email,
-          goal: 'Build better habits daily'
+          goal: 'Build better habits daily',
+          timezone: userTimezone,
+          country: user.user_metadata?.country || null,
+          signup_date: user.user_metadata?.signup_date || new Date().toISOString()
         });
 
       if (error) throw error;
@@ -204,6 +274,33 @@ function MainApp() {
     }
   }, [user, createUserProfile]);
 
+  // Setup notifications
+  const setupNotifications = useCallback(async () => {
+    // Clear existing timeout
+    if (notificationTimeout) {
+      clearTimeout(notificationTimeout);
+      setNotificationTimeout(null);
+    }
+
+    if (!userProfile.notifications) {
+      return;
+    }
+
+    // Request permission first
+    const hasPermission = await requestNotificationPermission();
+    
+    if (!hasPermission) {
+      console.log('Notification permission denied');
+      return;
+    }
+
+    // Schedule notifications
+    const timeout = scheduleNotification(userProfile.reminderTime, habitsWithCompletions);
+    setNotificationTimeout(timeout);
+    
+    console.log(`Notifications scheduled for ${userProfile.reminderTime}`);
+  }, [userProfile.notifications, userProfile.reminderTime, habits]);
+
   // Update profile when user changes
   useEffect(() => {
     if (user) {
@@ -222,6 +319,20 @@ function MainApp() {
       loadUserProfile();
     }
   }, [user, loadHabitsAndCompletions, loadUserProfile]);
+
+  // Setup notifications when profile or habits change
+  useEffect(() => {
+    if (habits.length > 0) {
+      setupNotifications();
+    }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+      }
+    };
+  }, [setupNotifications]);
 
   // Helper function to get completions for a habit
   const getHabitCompletions = (habitId) => {
@@ -260,17 +371,21 @@ function MainApp() {
   // Enhanced habits with completion data
   const habitsWithCompletions = habits.map(habit => {
     const completions = getHabitCompletions(habit.id);
-    const today = new Date().toISOString().split('T')[0];
+    const userTimezone = userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const today = new Date();
+    const userToday = new Date(today.toLocaleString("en-US", { timeZone: userTimezone }));
+    const todayString = userToday.toISOString().split('T')[0];
+    
     const todayCompletion = completions.find(c => 
-      new Date(c.completed_date).toISOString().split('T')[0] === today
+      new Date(c.completed_date).toISOString().split('T')[0] === todayString
     );
     
     return {
       ...habit,
       completions: completions.length,
       streak: calculateStreak(completions),
-      completed_dates: completions.map(c => new Date(c.completed_date).toDateString()),
-      last_completed: todayCompletion ? today : null
+      completed_dates: completions.map(c => new Date(c.completed_date).toISOString().split('T')[0]),
+      last_completed: todayCompletion ? todayString : null
     };
   });
 
@@ -301,9 +416,20 @@ function MainApp() {
     }
 
     try {
+      // Get user's timezone
+      const userTimezone = userProfile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Get today's date in user's timezone
+      const today = new Date();
+      const userToday = new Date(today.toLocaleString("en-US", { timeZone: userTimezone }));
+      const todayString = userToday.toISOString().split('T')[0];
+
+      console.log('User timezone:', userTimezone);
+      console.log('Today in user timezone:', todayString);
+
       const existingCompletion = habitCompletions.find(completion => 
         completion.habit_id === habitId && 
-        new Date(completion.completed_date).toISOString().split('T')[0] === today
+        new Date(completion.completed_date).toISOString().split('T')[0] === todayString
       );
 
       if (existingCompletion) {
@@ -319,13 +445,13 @@ function MainApp() {
           prev.filter(completion => completion.id !== existingCompletion.id)
         );
       } else {
-        // Add completion
+        // Add completion with user's timezone date
         const { data, error } = await supabase
           .from('habit_completions')
           .insert({
             habit_id: habitId,
             user_id: user.id,
-            completed_date: today
+            completed_date: todayString
           })
           .select()
           .single();
@@ -339,89 +465,82 @@ function MainApp() {
       
     } catch (error) {
       console.error('Error toggling habit completion:', error);
+      alert(`Failed to update habit: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  // Fixed addHabit function
+  const addHabit = async (habitData) => {
+    if (!user) {
+      console.error('No user found');
+      alert('Please sign in to add habits.');
+      return;
+    }
+
+    // Check for duplicate habit names
+    const existingHabit = habits.find(h => 
+      h.name.toLowerCase().trim() === habitData.name.toLowerCase().trim()
+    );
+    
+    if (existingHabit) {
+      alert('A habit with this name already exists. Please choose a different name.');
+      return;
+    }
+
+    // Validate habit data
+    if (!habitData.name || !habitData.name.trim()) {
+      alert('Please enter a habit name.');
+      return;
+    }
+
+    // Prepare the habit data for Supabase
+    const newHabit = {
+      name: habitData.name.trim(),
+      icon: habitData.icon || '✅',
+      color: habitData.color || 'bg-green-500',
+      category: habitData.category || 'general',
+      target_days: habitData.targetDays || 30,
+      user_id: user.id,
+      created_at: new Date().toISOString()
+    };
+
+    console.log('Adding habit:', newHabit);
+
+    try {
+      const { data, error } = await supabase
+        .from('habits')
+        .insert([newHabit])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       
-      if (error.name === 'NetworkError' || error.message.includes('fetch')) {
-        alert('Network connection issue. Please check your internet and try again.');
+      console.log('Habit added successfully:', data);
+      setHabits(prev => [...prev, data]);
+      
+      // Show success message
+      alert('Habit added successfully!');
+      
+    } catch (error) {
+      console.error('Error adding habit:', error);
+      
+      // Provide more specific error messages
+      if (error.code === '23505') {
+        alert('A habit with this name already exists.');
+      } else if (error.code === '23502') {
+        alert('Please fill in all required fields.');
       } else if (error.message.includes('auth')) {
         alert('Authentication error. Please sign in again.');
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        alert('Network error. Please check your connection and try again.');
       } else {
-        alert(`Failed to update habit: ${error.message || 'Unknown error'}`);
+        alert(`Failed to add habit: ${error.message || 'Unknown error'}`);
       }
     }
   };
-
- // Fixed addHabit function - replace the existing one in App.js
-const addHabit = async (habitData) => {
-  if (!user) {
-    console.error('No user found');
-    alert('Please sign in to add habits.');
-    return;
-  }
-
-  // Check for duplicate habit names
-  const existingHabit = habits.find(h => 
-    h.name.toLowerCase().trim() === habitData.name.toLowerCase().trim()
-  );
-  
-  if (existingHabit) {
-    alert('A habit with this name already exists. Please choose a different name.');
-    return;
-  }
-
-  // Validate habit data
-  if (!habitData.name || !habitData.name.trim()) {
-    alert('Please enter a habit name.');
-    return;
-  }
-
-  // Prepare the habit data for Supabase
-  const newHabit = {
-    name: habitData.name.trim(),
-    icon: habitData.icon || '✅',
-    color: habitData.color || 'bg-green-500',
-    category: habitData.category || 'general',
-    target_days: habitData.targetDays || 30,
-    user_id: user.id,
-    created_at: new Date().toISOString()
-  };
-
-  console.log('Adding habit:', newHabit);
-
-  try {
-    const { data, error } = await supabase
-      .from('habits')
-      .insert([newHabit]) // Wrap in array to be explicit
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Supabase error:', error);
-      throw error;
-    }
-    
-    console.log('Habit added successfully:', data);
-    setHabits(prev => [...prev, data]);
-    
-    // Show success message
-    alert('Habit added successfully!');
-    
-  } catch (error) {
-    console.error('Error adding habit:', error);
-    
-    // Provide more specific error messages
-    if (error.code === '23505') {
-      alert('A habit with this name already exists.');
-    } else if (error.code === '23502') {
-      alert('Please fill in all required fields.');
-    } else if (error.message.includes('auth')) {
-      alert('Authentication error. Please sign in again.');
-    } else if (error.message.includes('network') || error.message.includes('fetch')) {
-      alert('Network error. Please check your connection and try again.');
-    } else {
-      alert(`Failed to add habit: ${error.message || 'Unknown error'}`);
-    }
-  }
-};
 
   const updateHabit = async (habitId, updates) => {
     if (!user) return;
@@ -522,7 +641,7 @@ const addHabit = async (habitData) => {
         joinDate: new Date().toISOString(),
         notifications: true,
         darkMode: false,
-        reminderTime: '09:00',
+        reminderTime: '02:08',
         weekStartsOn: 'monday'
       });
     } catch (error) {
@@ -539,6 +658,13 @@ const addHabit = async (habitData) => {
   const handleSignOut = async () => {
     try {
       console.log('Signing out user...');
+      
+      // Clear notification timeout
+      if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+        setNotificationTimeout(null);
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Sign out error:', error);
@@ -580,7 +706,19 @@ const addHabit = async (habitData) => {
             <p className="text-sm text-gray-600">Build better habits daily</p>
           </div>
           <div className="flex gap-2 items-center">
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+            <button 
+              className={`p-2 rounded-lg transition-colors ${
+                userProfile.notifications 
+                  ? 'text-blue-500 bg-blue-50' 
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              onClick={() => {
+                if (!userProfile.notifications) {
+                  alert('Enable notifications in settings to get reminders!');
+                  setShowSettings(true);
+                }
+              }}
+            >
               <Bell size={20} />
             </button>
             <button 
