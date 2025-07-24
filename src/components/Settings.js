@@ -10,7 +10,7 @@ const Settings = ({ isOpen, onClose, userProfile, onUpdateProfile, onClearAllDat
   const [settings, setSettings] = useState({
     notifications: userProfile.notifications || false,
     darkMode: userProfile.darkMode || false,
-    reminderTime: userProfile.reminderTime || '02:08',
+    reminderTime: userProfile.reminderTime || '08:00',
     weekStartsOn: userProfile.weekStartsOn || 'monday'
   });
 

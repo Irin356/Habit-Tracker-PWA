@@ -93,7 +93,7 @@ function MainApp() {
     joinDate: new Date().toISOString(),
     notifications: true,
     darkMode: false,
-    reminderTime: '02:08',
+    reminderTime: '08:00',
     weekStartsOn: 'monday'
   });
 
@@ -641,7 +641,7 @@ function MainApp() {
         joinDate: new Date().toISOString(),
         notifications: true,
         darkMode: false,
-        reminderTime: '02:08',
+        reminderTime: '08:00',
         weekStartsOn: 'monday'
       });
     } catch (error) {
